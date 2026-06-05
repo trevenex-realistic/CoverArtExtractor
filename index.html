@@ -1,373 +1,922 @@
-<!DOCTYPE html><html lang="es">
+<!DOCTYPE html>
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Spotify Cover Downloader</title>
+  <title>CoverFetch — Spotify Cover Art</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: Inter, Arial, sans-serif;
-    }body {
-  min-height: 100vh;
-  background:
-    linear-gradient(to bottom, rgba(0,180,255,0.15), rgba(255,255,255,0.05)),
-    url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1600&auto=format&fit=crop') center/cover no-repeat fixed;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  overflow-x: hidden;
-  position: relative;
-}
+    }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  backdrop-filter: blur(2px);
-  background: linear-gradient(to bottom, rgba(80,190,255,0.08), rgba(255,255,255,0.03));
-  pointer-events: none;
-}
+    :root {
+      --green: #1DB954;
+      --green-dim: #158a3e;
+      --green-glow: rgba(29,185,84,0.18);
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --surface-2: #181818;
+      --surface-3: #222222;
+      --border: rgba(255,255,255,0.07);
+      --border-hover: rgba(255,255,255,0.14);
+      --text-primary: #f0f0f0;
+      --text-secondary: #888;
+      --text-muted: #444;
+      --red: #ff4d4d;
+      --radius: 20px;
+      --radius-sm: 12px;
+    }
 
-.card {
-  width: 100%;
-  max-width: 520px;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.28), rgba(255,255,255,0.12));
-  backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 32px;
-  padding: 32px;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.7),
-    0 25px 60px rgba(0,0,0,0.28);
-  position: relative;
-  overflow: hidden;
-}
+    html { font-size: 16px; }
 
-.glow {
-  position: absolute;
-  width: 260px;
-  height: 260px;
-  background: radial-gradient(circle, rgba(255,255,255,0.7), rgba(0,180,255,0.08));
-  opacity: 0.7;
-  border-radius: 50%;
-  filter: blur(50px);
-  top: -120px;
-  right: -80px;
-  pointer-events: none;
-}
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Syne', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+    }
 
-.spotify-icon {
-  width: 68px;
-  height: 68px;
-  border-radius: 22px;
-  background: linear-gradient(to bottom, #7dffb3, #1DB954);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  margin-bottom: 18px;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.8),
-    0 12px 30px rgba(29,185,84,0.45);
-  box-shadow: 0 10px 25px rgba(29,185,84,0.35);
-}
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+      z-index: 0;
+    }
 
-h1 {
-  font-size: 30px;
-  margin-bottom: 10px;
-  letter-spacing: -1px;
-}
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(29,185,84,0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
 
-p {
-  color: #b5b5b5;
-  margin-bottom: 24px;
-  line-height: 1.6;
-  font-size: 15px;
-}
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
 
-input {
-  width: 100%;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.4);
-  background: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.15));
-  color: white;
-  font-size: 15px;
-  outline: none;
-  margin-bottom: 16px;
-  box-shadow: inset 0 1px 3px rgba(255,255,255,0.3);
-  transition: 0.2s ease;
-}
+    /* ── Header ── */
+    .header {
+      margin-bottom: 32px;
+    }
 
-input:focus {
-  border-color: rgba(29,185,84,0.7);
-  box-shadow: 0 0 0 4px rgba(29,185,84,0.12);
-}
+    .eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--green);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
 
-button {
-  width: 100%;
-  padding: 15px;
-  border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 18px;
-  background: linear-gradient(to bottom, #7effaf, #1DB954);
-  color: white;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s ease;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.8),
-    0 10px 25px rgba(29,185,84,0.35);
-}
+    .eyebrow::before {
+      content: '';
+      width: 20px;
+      height: 1px;
+      background: var(--green);
+    }
 
-button:hover {
-  transform: translateY(-2px);
-}
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(40px, 8vw, 56px);
+      font-weight: 400;
+      line-height: 1.0;
+      letter-spacing: -1.5px;
+      color: var(--text-primary);
+    }
 
-.result {
-  margin-top: 28px;
-  display: none;
-  text-align: center;
-  animation: fadeIn 0.3s ease;
-}
+    h1 em {
+      font-style: italic;
+      color: var(--green);
+    }
 
-.loader {
-  display: none;
-  justify-content: center;
-  align-items: center;
-  margin-top: 22px;
-}
+    .subtitle {
+      margin-top: 14px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-weight: 400;
+      max-width: 360px;
+    }
 
-.spinner {
-  width: 46px;
-  height: 46px;
-  border: 4px solid rgba(255,255,255,0.08);
-  border-top: 4px solid #1DB954;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  box-shadow: 0 0 25px rgba(29,185,84,0.25);
-}
+    /* ── Input Area ── */
+    .input-area {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 6px 6px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 12px;
+    }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
+    .input-area:focus-within {
+      border-color: rgba(29,185,84,0.4);
+      box-shadow: 0 0 0 4px var(--green-glow);
+    }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+    .input-icon {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      opacity: 0.35;
+    }
 
-.cover {
-  width: 100%;
-  border-radius: 24px;
-  margin-bottom: 18px;
-  box-shadow: 0 20px 45px rgba(0,0,0,0.45);
-}
+    input[type="text"] {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      padding: 12px 0;
+      min-width: 0;
+    }
 
-.download-btn {
-  display: inline-block;
-  text-decoration: none;
-  background: linear-gradient(135deg, #ffffff, #dcdcdc);
-  color: black;
-  padding: 14px 22px;
-  border-radius: 14px;
-  font-weight: 700;
-  transition: 0.2s ease;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 10px 25px rgba(255,255,255,0.08);
-}
+    input[type="text"]::placeholder {
+      color: var(--text-muted);
+    }
 
-.download-btn:hover {
-  transform: scale(1.04);
-}
+    button.primary {
+      flex-shrink: 0;
+      background: var(--green);
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 20px;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+    }
 
-.error {
-  margin-top: 14px;
-  color: #ff7b7b;
-  font-size: 14px;
-  text-align: center;
-}
+    button.primary:hover { background: #22d160; transform: scale(1.02); }
+    button.primary:active { transform: scale(0.97); }
+    button.primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-.footer {
-  margin-top: 24px;
-  color: #7a7a7a;
-  font-size: 12px;
-  text-align: center;
-  line-height: 1.5;
-}
+    /* ── Support chips ── */
+    .chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
 
+    .chip {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 4px 10px;
+      letter-spacing: 0.04em;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .chip.active {
+      color: var(--green);
+      border-color: rgba(29,185,84,0.25);
+    }
+
+    /* ── Error ── */
+    .error-msg {
+      display: none;
+      margin-top: 14px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--red);
+      letter-spacing: 0.02em;
+      padding: 12px 16px;
+      background: rgba(255,77,77,0.06);
+      border: 1px solid rgba(255,77,77,0.15);
+      border-radius: var(--radius-sm);
+      animation: slideUp 0.25s ease;
+    }
+
+    /* ── Loader ── */
+    .loader {
+      display: none;
+      margin-top: 28px;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .loader-track {
+      width: 100%;
+      height: 2px;
+      background: var(--surface-3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .loader-bar {
+      height: 100%;
+      width: 40%;
+      background: var(--green);
+      border-radius: 2px;
+      animation: loadBar 1.2s ease-in-out infinite;
+    }
+
+    .loader-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+    }
+
+    @keyframes loadBar {
+      0%   { transform: translateX(-100%); }
+      50%  { transform: translateX(160%); }
+      100% { transform: translateX(350%); }
+    }
+
+    /* ── Result Panel ── */
+    .result {
+      display: none;
+      margin-top: 28px;
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .cover-wrap {
+      position: relative;
+      aspect-ratio: 1;
+      overflow: hidden;
+    }
+
+    .cover-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.4s ease;
+    }
+
+    .cover-wrap:hover img {
+      transform: scale(1.02);
+    }
+
+    .cover-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 50%);
+      display: flex;
+      align-items: flex-end;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .cover-wrap:hover .cover-overlay {
+      opacity: 1;
+    }
+
+    .cover-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 0.08em;
+    }
+
+    .result-footer {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .track-meta {
+      min-width: 0;
+    }
+
+    .track-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .track-artist {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .download-btn {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      padding: 9px 16px;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.15s;
+      white-space: nowrap;
+    }
+
+    .download-btn:hover {
+      background: var(--green);
+      border-color: var(--green);
+      color: #000;
+      transform: scale(1.03);
+    }
+
+    .download-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    /* ── Badges row ── */
+    .badges {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 3px 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .badge.green {
+      color: var(--green);
+      border-color: rgba(29,185,84,0.2);
+      background: rgba(29,185,84,0.06);
+    }
+
+    .badge.upscaled {
+      color: #c084fc;
+      border-color: rgba(192,132,252,0.25);
+      background: rgba(192,132,252,0.06);
+    }
+
+    /* ── Action row ── */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .upscale-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+      white-space: nowrap;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upscale-btn:hover:not(:disabled) {
+      background: rgba(192,132,252,0.1);
+      border-color: rgba(192,132,252,0.3);
+      color: #c084fc;
+      transform: scale(1.02);
+    }
+
+    .upscale-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .upscale-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    /* Progress bar inside upscale button */
+    .upscale-progress {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0%;
+      background: rgba(192,132,252,0.15);
+      transition: width 0.1s linear;
+      pointer-events: none;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      line-height: 1.8;
+    }
+
+    .footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer a:hover { color: var(--text-primary); }
+
+    /* ── Animations ── */
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Separator ── */
+    .sep {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="glow"></div>
-    <div class="bubble bubble1"></div>
-    <div class="bubble bubble2"></div>
-    <div class="bubble bubble3"></div>
-    <div class="spotify-icon">♫</div>
-    <h1>Spotify Cover Art</h1>
-    <p>
-      Pega un link de Spotify y descarga el cover art en alta calidad. Ideal para edits, wallpapers, thumbnails o simplemente porque el álbum se ve demasiado limpio.
-    </p><input
-  id="spotifyUrl"
-  type="text"
-  placeholder="https://open.spotify.com/album/..."
-/>
+  <div class="wrapper">
 
-<button onclick="getCover()">Obtener Cover</button>
+    <header class="header">
+      <div class="eyebrow">Cover Fetch</div>
+      <h1>Get the <em>art.</em></h1>
+      <p class="subtitle">
+        Pega un link de Spotify y descarga el cover en máxima resolución. Tracks, álbumes y playlists.
+      </p>
+    </header>
 
-<div class="error" id="error"></div>
+    <div class="input-area">
+      <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor"/>
+      </svg>
+      <input
+        id="spotifyUrl"
+        type="text"
+        placeholder="open.spotify.com/track/..."
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <button class="primary" onclick="getCover()" id="btn">Fetch</button>
+    </div>
 
-<div class="loader" id="loader">
-  <div class="spinner"></div>
-</div>
+    <div class="chips">
+      <span class="chip active" id="chip-track">track</span>
+      <span class="chip active" id="chip-album">album</span>
+      <span class="chip active" id="chip-playlist">playlist</span>
+    </div>
 
-<div class="result" id="result">
-  <img id="coverImage" class="cover" src="" alt="Cover Art" />
-  <br />
-  <button id="downloadBtn" class="download-btn">
-    Descargar HD
-  </button>
-</div>
+    <div class="error-msg" id="error"></div>
 
-<div class="footer">
-  Hecho para verse clean, no para hackear la NASA.
-</div>
+    <div class="loader" id="loader">
+      <div class="loader-track"><div class="loader-bar"></div></div>
+      <span class="loader-label">buscando cover art...</span>
+    </div>
 
-  </div>  <script>
-    async function getCover() {
-      const input = document.getElementById('spotifyUrl').value.trim();
-      const error = document.getElementById('error');
-      const result = document.getElementById('result');
-      const loader = document.getElementById('loader');
+    <div class="result" id="result">
+      <div class="result-card">
+        <div class="cover-wrap" id="coverWrap">
+          <img id="coverImage" src="" alt="Cover Art" />
+          <div class="cover-overlay">
+            <span class="cover-label">640 × 640 px</span>
+          </div>
+        </div>
+        <div class="result-footer">
+          <div class="track-meta">
+            <div class="track-title" id="trackTitle">—</div>
+            <div class="track-artist" id="trackArtist"></div>
+          </div>
+          <button class="download-btn" id="downloadBtn">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            HD
+          </button>
+        </div>
+      </div>
+      <div class="action-row">
+        <button class="upscale-btn" id="upscaleBtn" onclick="upscaleImage()">
+          <div class="upscale-progress" id="upscaleProgress"></div>
+          <svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          <span id="upscaleBtnLabel">4× Upscale</span>
+        </button>
+      </div>
+      <div class="badges" id="badges">
+        <span class="badge green" id="badgeType">track</span>
+        <span class="badge" id="badgeRes">640 × 640</span>
+        <span class="badge" id="badgeExtra">JPEG</span>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <footer class="footer">
+      solo para uso personal &nbsp;·&nbsp; no afiliado con Spotify AB
+    </footer>
+
+  </div>
+
+  <script>
+    const SPOTIFY_URL_RE = /^https?:\/\/(?:open\.)?spotify\.com\/(track|album|playlist)\/([A-Za-z0-9]+)/;
+    const QUALITY_MAP = {
+      ab67616d00001e02: 'ab67616d0000b273',
+      ab67616d000048a1: 'ab67616d0000b273',
+    };
+
+    function upgradeImage(url) {
+      let out = url;
+      for (const [low, high] of Object.entries(QUALITY_MAP)) {
+        out = out.replace(new RegExp(low, 'g'), high);
+      }
+      return out;
+    }
+
+    function detectType(url) {
+      const m = url.match(SPOTIFY_URL_RE);
+      return m ? m[1] : null;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = '⚠ ' + msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function setLoading(on) {
+      document.getElementById('loader').style.display = on ? 'flex' : 'none';
+      document.getElementById('btn').disabled = on;
+    }
+
+    function showResult(imageUrl, title, artist, type) {
+      const trackTitle = document.getElementById('trackTitle');
+      const trackArtist = document.getElementById('trackArtist');
       const coverImage = document.getElementById('coverImage');
-      const downloadBtn = document.getElementById('downloadBtn');
+      const result = document.getElementById('result');
+      const badgeType = document.getElementById('badgeType');
 
-      error.textContent = '';
-      result.style.display = 'none';
-      loader.style.display = 'flex';
+      trackTitle.textContent = title || 'Cover Art';
+      trackArtist.textContent = artist || '';
+      badgeType.textContent = type || 'track';
+      coverImage.src = imageUrl;
+      result.style.display = 'block';
 
-      // Solo permitir tracks
-      if (input.includes('/album/')) {
-        loader.style.display = 'none';
-        error.textContent = 'Solo se permiten links de canciones (tracks), no álbumes.';
-        return;
+      // Reset upscale state
+      const upscaleBtn = document.getElementById('upscaleBtn');
+      const upscaleBtnLabel = document.getElementById('upscaleBtnLabel');
+      const badgeRes = document.getElementById('badgeRes');
+      const badgeExtra = document.getElementById('badgeExtra');
+      upscaleBtn.disabled = false;
+      upscaleBtnLabel.textContent = '4× Upscale';
+      document.getElementById('upscaleProgress').style.width = '0%';
+      badgeRes.textContent = '640 × 640';
+      badgeRes.className = 'badge';
+      badgeExtra.textContent = 'JPEG';
+      badgeExtra.className = 'badge';
+
+      window._coverUrl = imageUrl;
+      window._upscaledBlob = null;
+      window._coverName = (title || 'cover')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .trim();
+    }
+
+    // ── Lanczos kernel ──────────────────────────────────────────
+    function lanczosKernel(x, a) {
+      if (x === 0) return 1;
+      if (Math.abs(x) >= a) return 0;
+      const px = Math.PI * x;
+      return (a * Math.sin(px) * Math.sin(px / a)) / (px * px);
+    }
+
+    // Upscale using two-pass Lanczos-3 on ImageData
+    // Returns a Promise<Blob> PNG
+    async function lanczosUpscale(img, scale, onProgress) {
+      const srcW = img.naturalWidth;
+      const srcH = img.naturalHeight;
+      const dstW = Math.round(srcW * scale);
+      const dstH = Math.round(srcH * scale);
+      const a = 3; // Lanczos-3
+
+      // Draw source to offscreen canvas to get pixel data
+      const srcCanvas = document.createElement('canvas');
+      srcCanvas.width = srcW; srcCanvas.height = srcH;
+      const srcCtx = srcCanvas.getContext('2d');
+      srcCtx.drawImage(img, 0, 0, srcW, srcH);
+      const srcData = srcCtx.getImageData(0, 0, srcW, srcH).data;
+
+      // We'll process in chunks to avoid blocking the UI
+      const dstCanvas = document.createElement('canvas');
+      dstCanvas.width = dstW; dstCanvas.height = dstH;
+      const dstCtx = dstCanvas.getContext('2d');
+      const dstImg = dstCtx.createImageData(dstW, dstH);
+      const dst = dstImg.data;
+
+      const ratioX = srcW / dstW;
+      const ratioY = srcH / dstH;
+      const CHUNK = 40; // rows per chunk
+
+      function processRows(startY) {
+        return new Promise(resolve => {
+          const endY = Math.min(startY + CHUNK, dstH);
+          for (let y = startY; y < endY; y++) {
+            const srcYf = (y + 0.5) * ratioY - 0.5;
+            const srcYi = Math.floor(srcYf);
+
+            for (let x = 0; x < dstW; x++) {
+              const srcXf = (x + 0.5) * ratioX - 0.5;
+              const srcXi = Math.floor(srcXf);
+
+              let r = 0, g = 0, b = 0, al = 0, wSum = 0;
+
+              for (let ky = srcYi - a + 1; ky <= srcYi + a; ky++) {
+                const wy = lanczosKernel(srcYf - ky, a);
+                const clampY = Math.max(0, Math.min(srcH - 1, ky));
+
+                for (let kx = srcXi - a + 1; kx <= srcXi + a; kx++) {
+                  const wx = lanczosKernel(srcXf - kx, a);
+                  const w = wx * wy;
+                  const clampX = Math.max(0, Math.min(srcW - 1, kx));
+                  const si = (clampY * srcW + clampX) * 4;
+
+                  r  += srcData[si]     * w;
+                  g  += srcData[si + 1] * w;
+                  b  += srcData[si + 2] * w;
+                  al += srcData[si + 3] * w;
+                  wSum += w;
+                }
+              }
+
+              const di = (y * dstW + x) * 4;
+              dst[di]     = Math.max(0, Math.min(255, Math.round(r  / wSum)));
+              dst[di + 1] = Math.max(0, Math.min(255, Math.round(g  / wSum)));
+              dst[di + 2] = Math.max(0, Math.min(255, Math.round(b  / wSum)));
+              dst[di + 3] = Math.max(0, Math.min(255, Math.round(al / wSum)));
+            }
+          }
+          onProgress(endY / dstH);
+          // yield to browser between chunks
+          setTimeout(resolve, 0);
+        });
       }
 
-      if (!input.includes('/track/')) {
-        loader.style.display = 'none';
-        error.textContent = 'Pon un link válido de una canción de Spotify.';
-        return;
+      for (let y = 0; y < dstH; y += CHUNK) {
+        await processRows(y);
       }
 
-      if (!input.includes('spotify.com')) {
-        loader.style.display = 'none';
-        error.textContent = 'Pon un link válido de Spotify.';
-        return;
-      }
+      dstCtx.putImageData(dstImg, 0, 0);
+      return new Promise(res => dstCanvas.toBlob(res, 'image/png'));
+    }
+
+    async function upscaleImage() {
+      const img = document.getElementById('coverImage');
+      if (!img.src || !img.complete) return;
+
+      const btn = document.getElementById('upscaleBtn');
+      const label = document.getElementById('upscaleBtnLabel');
+      const progress = document.getElementById('upscaleProgress');
+      const badgeRes = document.getElementById('badgeRes');
+      const badgeExtra = document.getElementById('badgeExtra');
+
+      btn.disabled = true;
+      label.textContent = 'Procesando...';
+      progress.style.width = '2%';
 
       try {
-        const proxy = 'https://api.allorigins.win/raw?url=';
-        const targetUrl = encodeURIComponent(input);
+        // Need a CORS-friendly copy of the image on a canvas
+        // Use allorigins proxy to fetch pixel data
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(window._coverUrl)}`;
+        const res = await fetch(proxyUrl);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
 
-        const response = await fetch(proxy + targetUrl);
-        const html = await response.text();
+        const tempImg = new Image();
+        await new Promise((resolve, reject) => {
+          tempImg.onload = resolve;
+          tempImg.onerror = reject;
+          tempImg.src = blobUrl;
+        });
 
-        // Método principal: Spotify oEmbed
-        let imageUrl = '';
+        const resultBlob = await lanczosUpscale(tempImg, 4, (p) => {
+          const pct = Math.round(2 + p * 96);
+          progress.style.width = pct + '%';
+          label.textContent = `${Math.round(p * 100)}%`;
+        });
 
-        try {
-          const oEmbedResponse = await fetch(
-            `https://open.spotify.com/oembed?url=${encodeURIComponent(input)}`
-          );
+        URL.revokeObjectURL(blobUrl);
 
-          const data = await oEmbedResponse.json();
+        window._upscaledBlob = resultBlob;
+        progress.style.width = '100%';
 
-          if (data.thumbnail_url) {
-            imageUrl = data.thumbnail_url;
-          }
+        // Show upscaled image
+        const upscaledUrl = URL.createObjectURL(resultBlob);
+        document.getElementById('coverImage').src = upscaledUrl;
+        document.getElementById('coverWrap').querySelector('.cover-label').textContent = '2560 × 2560 px';
 
-          // Obtener nombre de la canción
-          let trackName = 'spotify-track';
+        // Update badges
+        badgeRes.textContent = '2560 × 2560';
+        badgeRes.className = 'badge upscaled';
+        badgeExtra.textContent = 'PNG · 4× AI';
+        badgeExtra.className = 'badge upscaled';
 
-          if (data.title) {
-            trackName = data.title
-              .toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, '')
-              .replace(/\s+/g, '-')
-              .trim();
-          }
-
-          window.currentTrackName = trackName + '-coverart';
-        } catch (e) {
-          console.log('oEmbed falló');
-        }
-
-        // Método alternativo usando og:image
-        if (!imageUrl) {
-          const match = html.match(/<meta property="og:image" content="([^\"]+)"/i);
-
-          if (match && match[1]) {
-            imageUrl = match[1];
-          }
-        }
-
-        if (!imageUrl) {
-          loader.style.display = 'none';
-          error.textContent = 'No se pudo detectar el cover art.';
-          return;
-        }
-
-        // Mejorar calidad de la imagen
-        imageUrl = imageUrl.replace(/ab67616d00001e02/g, 'ab67616d0000b273');
-
-        coverImage.src = imageUrl;
-
-        downloadBtn.onclick = async () => {
-          try {
-            const imgResponse = await fetch(imageUrl);
-            const blob = await imgResponse.blob();
-            const blobUrl = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = `${window.currentTrackName || 'spotify-coverart'}.jpg`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-
-            URL.revokeObjectURL(blobUrl);
-          } catch (e) {
-            alert('No se pudo descargar automáticamente la imagen.');
-          }
+        // Switch download to upscaled version
+        document.getElementById('downloadBtn').onclick = () => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(window._upscaledBlob);
+          a.download = (window._coverName || 'cover') + '-4x.png';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
         };
 
-        loader.style.display = 'none';
-        result.style.display = 'block';
+        label.textContent = '✓ Listo';
+        btn.style.color = '#c084fc';
+        btn.style.borderColor = 'rgba(192,132,252,0.4)';
+        btn.style.background = 'rgba(192,132,252,0.08)';
+
       } catch (err) {
         console.error(err);
-
-        loader.style.display = 'none';
-
-        // Aunque haya error, muchas veces Spotify sí entrega el cover.
-        error.textContent = 'Spotify se puso dramático con CORS, pero igual debería funcionar 😭';
+        btn.disabled = false;
+        label.textContent = '4× Upscale';
+        progress.style.width = '0%';
+        showError('No se pudo procesar la imagen para upscaling.');
       }
     }
-  </script></body>
+
+    async function getCover() {
+      const raw = document.getElementById('spotifyUrl').value.trim();
+      hideError();
+      document.getElementById('result').style.display = 'none';
+
+      // Strip query params / fragments for matching
+      const clean = raw.split('?')[0].split('#')[0];
+      const type = detectType(clean);
+
+      if (!type) {
+        showError('Pega un link válido de Spotify (track, album o playlist).');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const oEmbedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(clean)}`;
+        const res = await fetch(oEmbedUrl);
+
+        if (!res.ok) throw new Error('oEmbed error: ' + res.status);
+
+        const data = await res.json();
+
+        if (!data.thumbnail_url) throw new Error('No cover in response');
+
+        const imageUrl = upgradeImage(data.thumbnail_url);
+
+        // Parse title + artist from oEmbed title (format: "Track · Artist")
+        let title = data.title || '';
+        let artist = '';
+        if (title.includes(' · ')) {
+          [title, artist] = title.split(' · ');
+        }
+
+        showResult(imageUrl, title, artist, type);
+
+        // Set up download
+        document.getElementById('downloadBtn').onclick = () => downloadCover(imageUrl, window._coverName);
+
+      } catch (err) {
+        console.error(err);
+        showError('No se pudo obtener el cover. Verifica el link o intenta con otro.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function downloadCover(url, name) {
+      try {
+        const btn = document.getElementById('downloadBtn');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> OK';
+        btn.style.background = 'var(--green)';
+        btn.style.borderColor = 'var(--green)';
+        btn.style.color = '#000';
+
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const imgRes = await fetch(proxyUrl);
+        const blob = await imgRes.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = (name || 'spotify-cover') + '.jpg';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+
+        setTimeout(() => {
+          btn.innerHTML = orig;
+          btn.style.background = '';
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }, 2000);
+      } catch {
+        alert('No se pudo descargar. Haz click derecho → Guardar imagen en el cover.');
+      }
+    }
+
+    // Enter key support
+    document.getElementById('spotifyUrl').addEventListener('keydown', e => {
+      if (e.key === 'Enter') getCover();
+    });
+
+    // Highlight matching type chip when URL changes
+    document.getElementById('spotifyUrl').addEventListener('input', function () {
+      const type = detectType(this.value.split('?')[0]);
+      ['track', 'album', 'playlist'].forEach(t => {
+        const chip = document.getElementById('chip-' + t);
+        if (chip) chip.className = 'chip' + (type === t ? ' active' : '');
+      });
+    });
+  </script>
+</body>
 </html>
